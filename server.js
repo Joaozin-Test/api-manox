@@ -24,10 +24,10 @@ export default {
         };
 
         // Middleware de Autenticação (Chave Admin)
-        const checkAdminKey = () => {
-            const adminKey = env.ADMIN_API_KEY;
-            const clientKey = request.headers.get("x-manox-key");
-            return adminKey && clientKey === adminKey;
+        const checkAdminKey = async () => {
+           const adminKey = await env.MANOX_KV.get("ADMIN_API_KEY");
+           const clientKey = request.headers.get("x-manox-key");
+           return adminKey && clientKey === adminKey;
         };
 
         // --- ROTAS DA API ---
@@ -331,4 +331,4 @@ export default {
         return jsonResponse({ success: false, message: "Rota não encontrada" }, 404);
     }
 };
-                  
+        
