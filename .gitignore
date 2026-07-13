@@ -1,0 +1,12 @@
+# Node modules (dependências)
+node_modules/
+dist/
+
+# Pastas locais e temporárias do Wrangler/Cloudflare
+.wrangler/
+.dev.vars
+
+# Arquivos de log
+*.log
+.DS_Store
+
