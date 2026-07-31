@@ -1,6 +1,6 @@
 export default {
     async fetch(request, env) {
-        const SUPABASE_URL = env.SUPABASE_URL
+        const SUPABASE_URL = "https://wqznykmqdfkqhuiswamy.supabase.co"
         const SUPABASE_KEY = env.SUPABASE_KEY
 
         const headers = {
