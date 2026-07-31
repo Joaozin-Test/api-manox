@@ -1,7 +1,7 @@
 export default {
     async fetch(request, env) {
-        const SUPABASE_URL = env.SUPABASE_URL;
-        const SUPABASE_KEY = env.SUPABASE_KEY;
+        const SUPABASE_URL = await env.MANOX_KV.get("SUPABASE_URL");
+        const SUPABASE_KEY = await env.MANOX_KV.get("SUPABASE_KEY");
 
         const headers = {
             "apikey": SUPABASE_KEY,
