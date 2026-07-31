@@ -1,100 +1,91 @@
-const activeUsersMap = new Map(); // Store { username_lowercase: { username, userId, lastSeen } }
-
 export default {
     async fetch(request, env) {
+        const SUPABASE_URL = env.SUPABASE_URL;
+        const SUPABASE_KEY = env.SUPABASE_KEY;
+
+        const headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json"
+        };
+
         const url = new URL(request.url);
         const method = request.method;
 
         const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), {
             status,
-            headers: { 
-                "Content-Type": "application/json", 
-                "Access-Control-Allow-Origin": "*" 
-            }
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
         });
 
-        const getBody = async () => {
-            try { return await request.json(); } catch { return {}; }
-        };
-
+        const getBody = async () => { try { return await request.json(); } catch { return {}; } };
         const now = Date.now();
 
-        // Helper para limpar usuários inativos da RAM (mais de 10 minutos sem heartbeat)
-        const cleanInactiveUsers = () => {
-            const TEN_MINUTES = 10 * 60 * 1000;
-            for (const [key, user] of activeUsersMap.entries()) {
-                if (now - user.lastSeen > TEN_MINUTES) {
-                    activeUsersMap.delete(key);
-                }
-            }
-        };
-
-        // --- REGISTRO / EXECUÇÃO DO SCRIPT ---
+        // POST /api/manox/register
         if (method === "POST" && url.pathname === "/api/manox/register") {
             const { username, userId } = await getBody();
+            if (!username || username.trim() === "") return jsonResponse({ success: false, message: "Username inválido" }, 400);
 
-            if (typeof username !== "string" || username.length < 1) {
-                return jsonResponse({ success: false, message: "username inválido" }, 400);
+            const cleanUsername = username.trim();
+
+            await fetch(`${SUPABASE_URL}/rest/v1/online_users`, {
+                method: "POST",
+                headers: { ...headers, "Prefer": "resolution=merge-duplicates" },
+                body: JSON.stringify({ username: cleanUsername, user_id: userId || null, last_seen: now })
+            });
+
+            const getRes = await fetch(`${SUPABASE_URL}/rest/v1/stats?key=eq.total_executions`, { headers });
+            const data = await getRes.json();
+
+            let totalExecutions = 1;
+            if (data && data.length > 0) {
+                totalExecutions = parseInt(data[0].value, 10) + 1;
+                await fetch(`${SUPABASE_URL}/rest/v1/stats?key=eq.total_executions`, {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({ value: String(totalExecutions) })
+                });
+            } else {
+                await fetch(`${SUPABASE_URL}/rest/v1/stats`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({ key: "total_executions", value: "1" })
+                });
             }
 
-            const userKey = username.toLowerCase().trim();
-
-            // 1. Atualiza/Adiciona usuário ativo na memória RAM
-            activeUsersMap.set(userKey, {
-                username: username.trim(),
-                userId: userId || null,
-                lastSeen: now
-            });
-
-            // 2. Incrementa o Contador Total de Execuções NO KV
-            // Usamos a chave "total_executions" no KV para salvar esse número
-            let currentExecutions = await env.MANOX_KV.get("total_executions");
-            let totalExecutions = currentExecutions ? parseInt(currentExecutions, 10) + 1 : 1;
-            
-            await env.MANOX_KV.put("total_executions", String(totalExecutions));
-
-            return jsonResponse({ 
-                success: true, 
-                totalExecutions 
-            });
+            return jsonResponse({ success: true, totalExecutions });
         }
 
-        // --- HEARTBEAT (MANTÉM O JOGADOR ONLINE NA RAM) ---
+        // POST /api/manox/heartbeat
         if (method === "POST" && url.pathname === "/api/manox/heartbeat") {
             const { username } = await getBody();
+            if (!username) return jsonResponse({ success: false }, 400);
 
-            if (typeof username !== "string" || username.trim() === "") {
-                return jsonResponse({ success: false, message: "username inválido" }, 400);
-            }
-
-            const userKey = username.toLowerCase().trim();
-
-            if (activeUsersMap.has(userKey)) {
-                const userData = activeUsersMap.get(userKey);
-                userData.lastSeen = now;
-                activeUsersMap.set(userKey, userData);
-            }
+            await fetch(`${SUPABASE_URL}/rest/v1/online_users?username=eq.${encodeURIComponent(username.trim())}`, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({ last_seen: now })
+            });
 
             return jsonResponse({ success: true });
         }
 
-        // --- RETORNA USUÁRIOS ATIVOS E ESTATÍSTICAS ---
+        // GET /api/manox/users
         if (method === "GET" && url.pathname === "/api/manox/users") {
-            cleanInactiveUsers(); // Remove inativos antes de responder
+            const FIVE_MINUTES_AGO = now - (5 * 60 * 1000);
 
-            const activeList = [];
-            for (const user of activeUsersMap.values()) {
-                activeList.push(user.username);
-            }
+            const usersRes = await fetch(`${SUPABASE_URL}/rest/v1/online_users?last_seen=gt.${FIVE_MINUTES_AGO}`, { headers });
+            const activeUsersData = await usersRes.json();
+            const activeList = Array.isArray(activeUsersData) ? activeUsersData.map(u => u.username) : [];
 
-            // Busca o total de execuções direto do KV
-            const totalExecutions = await env.MANOX_KV.get("total_executions") || "0";
+            const statsRes = await fetch(`${SUPABASE_URL}/rest/v1/stats?key=eq.total_executions`, { headers });
+            const statsData = await statsRes.json();
+            const totalExecutions = (statsData && statsData.length > 0) ? parseInt(statsData[0].value, 10) : 0;
 
-            return jsonResponse({ 
-                success: true, 
-                onlineCount: activeList.length, // Quantos jogadores estão usando agora
-                users: activeList,              // Lista dos nomes online
-                totalExecutions: parseInt(totalExecutions, 10) // Quantos executaram no total
+            return jsonResponse({
+                success: true,
+                onlineCount: activeList.length,
+                users: activeList,
+                totalExecutions
             });
         }
 
