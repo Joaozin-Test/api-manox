@@ -1,12 +1,13 @@
 export default {
     async fetch(request, env) {
-        const SUPABASE_URL = "https://wqznykmqdfkqhuiswamy.supabase.co"
-        const SUPABASE_KEY = env.SUPABASE_KEY
+        const SUPABASE_URL = env.SUPABASE_URL;
+        const SUPABASE_KEY = env.SUPABASE_KEY;
 
         const headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": `Bearer ${SUPABASE_KEY}`,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
         };
 
         const url = new URL(request.url);
