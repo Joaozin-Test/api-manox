@@ -74,7 +74,10 @@ export default {
         if (method === "GET" && url.pathname === "/api/manox/users") {
             const FIVE_MINUTES_AGO = now - (5 * 60 * 1000);
 
-            const usersRes = await fetch(`${SUPABASE_URL}/rest/v1/online_users?last_seen=gt.${FIVE_MINUTES_AGO}`, { headers });
+            const usersRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/online_users?last_seen=gt.${FIVE_MINUTES_AGO}&order=last_seen.desc&limit=100000`,
+                { headers }
+            );
             const activeUsersData = await usersRes.json();
             const activeList = Array.isArray(activeUsersData) ? activeUsersData.map(u => u.username) : [];
 
