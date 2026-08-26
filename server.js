@@ -21,7 +21,7 @@ export default {
         const getBody = async () => { try { return await request.json(); } catch { return {}; } };
         const now = Date.now();
 
-        // POST /api/manox/register
+        // POST /api/manox/register kk
         if (method === "POST" && url.pathname === "/api/manox/register") {
             const { username, userId } = await getBody();
             if (!username || username.trim() === "") return jsonResponse({ success: false, message: "Username inválido" }, 400);
