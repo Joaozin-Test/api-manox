@@ -93,6 +93,104 @@ export default {
             });
         }
 
+        // --- DADOS DO USUÁRIO ROBLOX ---
+if (method === "GET" && url.pathname === "/api/manox/roblox-user") {
+    const username = url.searchParams.get("username");
+
+    if (!username || !username.trim()) {
+        return jsonResponse({
+            success: false,
+            message: "Username necessário."
+        }, 400);
+    }
+
+    try {
+        const robloxRes = await fetch(
+            "https://users.roblox.com/v1/usernames/users",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    usernames: [username.trim()],
+                    excludeBannedUsers: false
+                })
+            }
+        );
+
+        if (!robloxRes.ok) {
+            return jsonResponse({
+                success: false,
+                message: "Erro ao consultar o Roblox.",
+                status: robloxRes.status
+            }, 502);
+        }
+
+        const robloxData = await robloxRes.json();
+
+        if (
+            !robloxData ||
+            !Array.isArray(robloxData.data) ||
+            robloxData.data.length === 0
+        ) {
+            return jsonResponse({
+                success: true,
+                exists: false,
+                username: username.trim(),
+                userId: null,
+                displayName: null,
+                avatar: null
+            });
+        }
+
+        const user = robloxData.data[0];
+
+        let avatar = null;
+
+        try {
+            const thumbnailRes = await fetch(
+                `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=true`
+            );
+
+            if (thumbnailRes.ok) {
+                const thumbnailData = await thumbnailRes.json();
+
+                if (
+                    thumbnailData &&
+                    Array.isArray(thumbnailData.data) &&
+                    thumbnailData.data.length > 0
+                ) {
+                    avatar = thumbnailData.data[0].imageUrl || null;
+                }
+            }
+        } catch (thumbnailError) {
+            console.error("Erro ao obter avatar:", thumbnailError);
+        }
+
+        return jsonResponse({
+            success: true,
+            exists: true,
+
+            username: user.name,
+            displayName: user.displayName,
+            userId: user.id,
+
+            avatar: avatar,
+
+            profileUrl: `https://www.roblox.com/users/${user.id}/profile`
+        });
+
+    } catch (error) {
+        console.error("Erro Roblox:", error);
+
+        return jsonResponse({
+            success: false,
+            message: "Não foi possível consultar o Roblox."
+        }, 500);
+    }
+}
+
         return jsonResponse({ success: false, message: "Rota não encontrada" }, 404);
     }
 };
