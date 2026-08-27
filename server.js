@@ -191,6 +191,68 @@ if (method === "GET" && url.pathname === "/api/manox/roblox-user") {
     }
 }
 
+// 1. ENVIAR LOG (POST)
+if (method === "POST" && url.pathname === "/api/manox/logs/send") {
+    const body = await getBody();
+    const { username, userId, executor, gameName, placeId, jobId, hubName } = body;
+
+    if (!username || !userId) {
+        return jsonResponse({ success: false, message: "Campos obrigatórios ausentes." }, 400);
+    }
+
+    const logData = {
+        username: username.trim(),
+        user_id: String(userId),
+        executor: executor ? executor.trim() : "Desconhecido",
+        game_name: gameName ? gameName.trim() : "Jogo Desconhecido",
+        place_id: String(placeId || ""),
+        job_id: String(jobId || ""),
+        hub_name: hubName ? hubName.trim() : "Manox Hub",
+        created_at: now
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/user_logs`, {
+        method: "POST",
+        headers: { ...headers, "Prefer": "return=minimal" },
+        body: JSON.stringify(logData)
+    });
+
+    if (!res.ok) {
+        return jsonResponse({ success: false, message: "Erro ao salvar log no banco de dados." }, 500);
+    }
+
+    return jsonResponse({ success: true, message: "Log registrado com sucesso!" }, 201);
+}
+
+// 2. RECEBER/LISTAR LOGS (GET)
+if (method === "GET" && url.pathname === "/api/manox/logs") {
+    const limit = url.searchParams.get("limit") || "50";
+    
+    const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_logs?select=*&order=created_at.desc&limit=${limit}`,
+        { headers }
+    );
+
+    const logs = await res.json();
+
+    return jsonResponse({
+        success: true,
+        logs: Array.isArray(logs) ? logs : []
+    });
+}
+
+// 3. LIMPAR LOGS (POST - Opcional)
+if (method === "POST" && url.pathname === "/api/manox/logs/clear") {
+    if (!checkAdminKey()) return jsonResponse({ success: false, message: "Não autorizado" }, 401);
+
+    await fetch(`${SUPABASE_URL}/rest/v1/user_logs?id=gt.0`, {
+        method: "DELETE",
+        headers
+    });
+
+    return jsonResponse({ success: true, message: "Todos os logs foram apagados." });
+}
+    
         return jsonResponse({ success: false, message: "Rota não encontrada" }, 404);
     }
 };
