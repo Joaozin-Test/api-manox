@@ -252,6 +252,62 @@ if (method === "POST" && url.pathname === "/api/manox/logs/clear") {
 
     return jsonResponse({ success: true, message: "Todos os logs foram apagados." });
 }
+
+// 1. ALTERAR VISIBILIDADE DA TAG (POST)
+if (method === "POST" && url.pathname === "/api/manox/user/tag-visibility") {
+    if (!checkAdminKey()) return jsonResponse({ success: false, message: "Não autorizado" }, 401);
+
+    const { username, visible } = await getBody();
+
+    if (!username || typeof visible !== "boolean") {
+        return jsonResponse({ success: false, message: "Parâmetros 'username' e 'visible' (boolean) são obrigatórios." }, 400);
+    }
+
+    // Atualiza a preferência no Supabase
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/user_logs?username=eq.${encodeURIComponent(username.trim())}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ tag_visible: visible })
+    });
+
+    if (!res.ok) {
+        return jsonResponse({ success: false, message: "Erro ao atualizar no banco de dados." }, 500);
+    }
+
+    return jsonResponse({ 
+        success: true, 
+        username: username.trim(), 
+        tagVisible: visible 
+    });
+}
+
+// 2. CONSULTAR VISIBILIDADE DA TAG (GET)
+if (method === "GET" && url.pathname === "/api/manox/user/tag-visibility") {
+    const username = url.searchParams.get("username");
+
+    if (!username) {
+        return jsonResponse({ success: false, message: "Parâmetro 'username' é obrigatório." }, 400);
+    }
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/user_logs?username=eq.${encodeURIComponent(username.trim())}&select=tag_visible&limit=1`, { headers });
+    const data = await res.json();
+
+    if (Array.isArray(data) && data.length > 0) {
+        const isVisible = data[0].tag_visible !== false; // Se for null ou undefined, padrão é true
+        return jsonResponse({ 
+            success: true, 
+            username: username.trim(), 
+            tagVisible: isVisible 
+        });
+    }
+
+    // Se o usuário ainda não tiver registro, retorna o padrão (true)
+    return jsonResponse({ 
+        success: true, 
+        username: username.trim(), 
+        tagVisible: true 
+    });
+}
     
         return jsonResponse({ success: false, message: "Rota não encontrada" }, 404);
     }
