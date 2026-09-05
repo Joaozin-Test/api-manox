@@ -254,7 +254,7 @@ if (method === "POST" && url.pathname === "/api/manox/logs/clear") {
 }
 
 // 1. ALTERAR VISIBILIDADE DA TAG (POST)
-if (method === "POST" && url.pathname === "/api/manox/user/tag-visibility") {
+if (method === "POST" && url.pathname === "/api/manox/user/tag-visibility-set") {
     if (!checkAdminKey()) return jsonResponse({ success: false, message: "Não autorizado" }, 401);
 
     const { username, visible } = await getBody();
